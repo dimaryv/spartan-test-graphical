@@ -54,14 +54,14 @@ cd /path/to/spartan-test-graphical
 python3 app.py
 ```
 
-The first screen detects and displays base server characteristics, then lists all discovered test cases with checked checkboxes by default. Use **Select all**, **Deselect all**, and **Run test cases** to control execution.
+The application opens fullscreen. The first screen detects and displays base server characteristics, then lists all discovered test cases with checked checkboxes by default. Use **Select all**, **Deselect all**, and **▶ Run test cases** to control execution.
 
 After starting execution, the app opens a fullscreen run view split vertically:
 
 - left side: live text logs from test case execution with colored highlights for running, passed, failed, skipped, and error messages;
-- right side: all test cases in order with color-coded `PENDING`, `RUNNING`, `PASSED`, `FAILED`, or `SKIPPED` status badges.
+- right side: all test cases in order with color-coded `PENDING`, `RUNNING`, `PASSED`, `FAILED`, or `SKIPPED` status badges and a spinner animation while a test is running.
 
-Press `Esc` to leave fullscreen mode.
+Press `Esc` to leave fullscreen mode. The sample suite includes a `Sleep 20 seconds` test case so you can see the running animation before the test completes.
 
 ## Test case format
 

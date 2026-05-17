@@ -30,6 +30,8 @@ COLORS = {
     "primary": "#2563eb",
     "primary_dark": "#1e3a8a",
     "primary_soft": "#dbeafe",
+    "accent": "#38bdf8",
+    "success": "#22c55e",
     "text": "#0f172a",
     "muted": "#64748b",
     "border": "#cbd5e1",
@@ -235,19 +237,32 @@ class SelectionWindow(ttk.Frame):
         characteristics_card.columnconfigure(3, weight=1)
 
         tests_card = make_card(content, fill=tk.BOTH, expand=True)
+        tests_header = tk.Frame(tests_card, bg=COLORS["surface"])
+        tests_header.pack(fill=tk.X, pady=(0, 12))
+        title_block = tk.Frame(tests_header, bg=COLORS["surface"])
+        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
         tk.Label(
-            tests_card,
+            title_block,
             text="Test cases",
             bg=COLORS["surface"],
             fg=COLORS["text"],
-            font=("TkDefaultFont", 16, "bold"),
+            font=("TkDefaultFont", 18, "bold"),
         ).pack(anchor=tk.W)
         tk.Label(
-            tests_card,
-            text="All test cases are selected by default.",
+            title_block,
+            text="All discovered checks are selected by default. Disable anything you do not want to run.",
             bg=COLORS["surface"],
             fg=COLORS["muted"],
-        ).pack(anchor=tk.W, pady=(2, 10))
+        ).pack(anchor=tk.W, pady=(2, 0))
+        tk.Label(
+            tests_header,
+            text=f"{len(self.test_cases)} loaded",
+            bg=COLORS["primary_soft"],
+            fg=COLORS["primary_dark"],
+            font=("TkDefaultFont", 10, "bold"),
+            padx=14,
+            pady=7,
+        ).pack(side=tk.RIGHT)
 
         list_frame = tk.Frame(tests_card, bg=COLORS["surface"])
         list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
@@ -267,32 +282,71 @@ class SelectionWindow(ttk.Frame):
                 bg=COLORS["surface"],
                 fg=COLORS["muted"],
             ).pack(anchor=tk.W)
-        for test_case in self.test_cases:
-            self.add_test_case_checkbox(test_case)
+        for index, test_case in enumerate(self.test_cases, start=1):
+            self.add_test_case_checkbox(test_case, index)
 
         buttons = tk.Frame(tests_card, bg=COLORS["surface"])
         buttons.pack(fill=tk.X)
         ttk.Button(buttons, text="Select all", style="Secondary.TButton", command=lambda: self.set_all(True)).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(buttons, text="Deselect all", style="Secondary.TButton", command=lambda: self.set_all(False)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons, text="Run test cases", style="Primary.TButton", command=self.run_selected).pack(side=tk.RIGHT)
+        ttk.Button(buttons, text="▶  Run test cases", style="Primary.TButton", command=self.run_selected).pack(side=tk.RIGHT)
 
-    def add_test_case_checkbox(self, test_case: TestCase) -> None:
+    def add_test_case_checkbox(self, test_case: TestCase, index: int) -> None:
         var = tk.BooleanVar(value=True)
         self.selected[test_case] = var
-        row = tk.Frame(self.check_frame, bg=COLORS["surface_soft"], highlightbackground=COLORS["border"], highlightthickness=1, padx=12, pady=8)
-        row.pack(fill=tk.X, pady=4)
-        text = test_case.name if not test_case.description else f"{test_case.name} — {test_case.description}"
-        tk.Checkbutton(
+        row = tk.Frame(
+            self.check_frame,
+            bg=COLORS["surface_soft"],
+            highlightbackground=COLORS["border"],
+            highlightthickness=1,
+            padx=12,
+            pady=10,
+        )
+        row.pack(fill=tk.X, pady=6)
+
+        badge = tk.Label(
             row,
-            text=text,
+            text=f"{index:02d}",
+            bg=COLORS["primary"],
+            fg="#ffffff",
+            font=("TkDefaultFont", 10, "bold"),
+            padx=10,
+            pady=6,
+        )
+        badge.pack(side=tk.LEFT, padx=(0, 12))
+
+        details = tk.Frame(row, bg=COLORS["surface_soft"])
+        details.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Checkbutton(
+            details,
+            text=test_case.name,
             variable=var,
             bg=COLORS["surface_soft"],
             activebackground=COLORS["primary_soft"],
             fg=COLORS["text"],
             selectcolor=COLORS["primary_soft"],
             anchor=tk.W,
-            font=("TkDefaultFont", 10, "bold"),
+            font=("TkDefaultFont", 11, "bold"),
         ).pack(fill=tk.X, anchor=tk.W)
+        if test_case.description:
+            tk.Label(
+                details,
+                text=test_case.description,
+                bg=COLORS["surface_soft"],
+                fg=COLORS["muted"],
+                anchor=tk.W,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X, anchor=tk.W, padx=(24, 0), pady=(2, 0))
+
+        tk.Label(
+            row,
+            text="Ready",
+            bg=COLORS["primary_soft"],
+            fg=COLORS["primary_dark"],
+            font=("TkDefaultFont", 9, "bold"),
+            padx=10,
+            pady=4,
+        ).pack(side=tk.RIGHT, padx=(12, 0))
 
     def set_all(self, value: bool) -> None:
         for variable in self.selected.values():
@@ -325,6 +379,8 @@ class RunWindow(ttk.Frame):
         self.status_by_case = {case: ("pending" if case in selected_cases else "skipped") for case in all_cases}
         self.status_rows: dict[TestCase, tk.Frame] = {}
         self.status_labels: dict[TestCase, tk.Label] = {}
+        self.status_spinners: dict[TestCase, tuple[tk.Canvas, int]] = {}
+        self.spinner_angle = 0
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.pack(fill=tk.BOTH, expand=True)
         self.build_ui()
@@ -333,6 +389,7 @@ class RunWindow(ttk.Frame):
         self.master.bind("<Escape>", lambda event: self.master.attributes("-fullscreen", False))
         threading.Thread(target=self.worker, daemon=True).start()
         self.process_events()
+        self.animate_spinners()
 
     def build_ui(self) -> None:
         self.master.title("Spartan Test Runner — Running")
@@ -419,6 +476,10 @@ class RunWindow(ttk.Frame):
             fg=COLORS["text"],
             font=("TkDefaultFont", 11, "bold"),
         ).pack(side=tk.LEFT, fill=tk.X, expand=True, anchor=tk.W)
+        spinner = tk.Canvas(row, width=28, height=28, bg=style["bg"], highlightthickness=0)
+        spinner_item = spinner.create_arc(5, 5, 23, 23, start=0, extent=270, style=tk.ARC, width=4, outline=COLORS["primary"])
+        spinner.itemconfigure(spinner_item, state=(tk.NORMAL if status == "running" else tk.HIDDEN))
+        spinner.pack(side=tk.RIGHT, padx=(8, 0))
         label = tk.Label(
             row,
             text=self.format_status(status),
@@ -431,6 +492,7 @@ class RunWindow(ttk.Frame):
         label.pack(side=tk.RIGHT)
         self.status_rows[test_case] = row
         self.status_labels[test_case] = label
+        self.status_spinners[test_case] = (spinner, spinner_item)
 
     def worker(self) -> None:
         self.events.put(("log", ("Starting selected test cases...\n", "info")))
@@ -495,7 +557,17 @@ class RunWindow(ttk.Frame):
         row.configure(bg=style["bg"])
         for child in row.winfo_children():
             child.configure(bg=style["bg"])
+        spinner, spinner_item = self.status_spinners[test_case]
+        spinner.configure(bg=style["bg"])
+        spinner.itemconfigure(spinner_item, state=(tk.NORMAL if status == "running" else tk.HIDDEN))
         label.configure(text=self.format_status(status), fg=style["fg"])
+
+    def animate_spinners(self) -> None:
+        self.spinner_angle = (self.spinner_angle + 14) % 360
+        for test_case, (spinner, spinner_item) in self.status_spinners.items():
+            if self.status_by_case[test_case] == "running":
+                spinner.itemconfigure(spinner_item, start=self.spinner_angle)
+        self.after(80, self.animate_spinners)
 
     @staticmethod
     def format_status(status: str) -> str:
@@ -507,6 +579,8 @@ def main() -> None:
     root = tk.Tk()
     root.geometry("1100x760")
     root.minsize(900, 600)
+    root.attributes("-fullscreen", True)
+    root.bind("<Escape>", lambda event: root.attributes("-fullscreen", False))
     configure_theme(root)
     SelectionWindow(root, load_test_cases())
     root.mainloop()
