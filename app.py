@@ -23,6 +23,35 @@ ROOT_DIR = Path(__file__).resolve().parent
 TEST_CASES_DIR = ROOT_DIR / "test_cases"
 STATUSES = ("pending", "running", "passed", "failed", "skipped")
 
+COLORS = {
+    "app_bg": "#eef2ff",
+    "surface": "#ffffff",
+    "surface_soft": "#f8fafc",
+    "primary": "#2563eb",
+    "primary_dark": "#1e3a8a",
+    "primary_soft": "#dbeafe",
+    "text": "#0f172a",
+    "muted": "#64748b",
+    "border": "#cbd5e1",
+    "log_bg": "#0f172a",
+    "log_text": "#e2e8f0",
+}
+STATUS_STYLES = {
+    "pending": {"bg": "#e2e8f0", "fg": "#334155", "icon": "●"},
+    "running": {"bg": "#dbeafe", "fg": "#1d4ed8", "icon": "▶"},
+    "passed": {"bg": "#dcfce7", "fg": "#15803d", "icon": "✓"},
+    "failed": {"bg": "#fee2e2", "fg": "#b91c1c", "icon": "✕"},
+    "skipped": {"bg": "#fef3c7", "fg": "#92400e", "icon": "–"},
+}
+LOG_TAG_COLORS = {
+    "info": "#bfdbfe",
+    "running": "#93c5fd",
+    "passed": "#86efac",
+    "failed": "#fca5a5",
+    "skipped": "#fde68a",
+    "error": "#f87171",
+}
+
 
 @dataclass(frozen=True)
 class TestCase:
@@ -32,13 +61,6 @@ class TestCase:
     description: str
     path: Path
     command: tuple[str, ...]
-
-
-def read_first_line(path: Path, default: str = "Unknown") -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="replace").splitlines()[0].strip()
-    except (OSError, IndexError):
-        return default
 
 
 def bytes_to_gib(value: int) -> str:
@@ -132,33 +154,106 @@ def load_test_cases(test_cases_dir: Path = TEST_CASES_DIR) -> list[TestCase]:
     return test_cases
 
 
+def configure_theme(root: tk.Tk | tk.Toplevel) -> None:
+    style = ttk.Style(root)
+    if "clam" in style.theme_names():
+        style.theme_use("clam")
+    style.configure("App.TFrame", background=COLORS["app_bg"])
+    style.configure("Primary.TButton", background=COLORS["primary"], foreground="#ffffff", padding=(14, 8))
+    style.map("Primary.TButton", background=[("active", COLORS["primary_dark"])])
+    style.configure("Secondary.TButton", padding=(14, 8))
+
+
+def make_card(parent: tk.Widget, **pack_options: object) -> tk.Frame:
+    card = tk.Frame(parent, bg=COLORS["surface"], highlightbackground=COLORS["border"], highlightthickness=1, padx=16, pady=14)
+    card.pack(**pack_options)
+    return card
+
+
 class SelectionWindow(ttk.Frame):
     def __init__(self, master: tk.Tk, test_cases: list[TestCase]) -> None:
-        super().__init__(master, padding=16)
+        super().__init__(master)
         self.master = master
         self.test_cases = test_cases
         self.selected: dict[TestCase, tk.BooleanVar] = {}
+        self.configure(style="App.TFrame")
         self.pack(fill=tk.BOTH, expand=True)
         self.build_ui()
 
     def build_ui(self) -> None:
         self.master.title("Spartan Test Runner")
-        ttk.Label(self, text="Server characteristics", font=("TkDefaultFont", 16, "bold")).pack(anchor=tk.W)
+        self.master.configure(bg=COLORS["app_bg"])
 
-        characteristics = ttk.Frame(self)
-        characteristics.pack(fill=tk.X, pady=(8, 18))
-        for row, (label, value) in enumerate(get_server_characteristics()):
-            ttk.Label(characteristics, text=f"{label}:", font=("TkDefaultFont", 10, "bold")).grid(row=row, column=0, sticky=tk.W, padx=(0, 12), pady=2)
-            ttk.Label(characteristics, text=value).grid(row=row, column=1, sticky=tk.W, pady=2)
-        characteristics.columnconfigure(1, weight=1)
+        header = tk.Frame(self, bg=COLORS["primary_dark"], padx=24, pady=18)
+        header.pack(fill=tk.X)
+        tk.Label(
+            header,
+            text="Spartan Test Runner",
+            bg=COLORS["primary_dark"],
+            fg="#ffffff",
+            font=("TkDefaultFont", 24, "bold"),
+        ).pack(anchor=tk.W)
+        tk.Label(
+            header,
+            text="Select server test cases and monitor execution in a color-coded report",
+            bg=COLORS["primary_dark"],
+            fg="#bfdbfe",
+            font=("TkDefaultFont", 11),
+        ).pack(anchor=tk.W, pady=(4, 0))
 
-        ttk.Label(self, text="Test cases", font=("TkDefaultFont", 16, "bold")).pack(anchor=tk.W)
-        list_frame = ttk.Frame(self)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 12))
+        content = tk.Frame(self, bg=COLORS["app_bg"], padx=20, pady=20)
+        content.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(list_frame, highlightthickness=0)
+        characteristics_card = make_card(content, fill=tk.X, pady=(0, 16))
+        tk.Label(
+            characteristics_card,
+            text="Server characteristics",
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=("TkDefaultFont", 16, "bold"),
+        ).grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 10))
+
+        for index, (label, value) in enumerate(get_server_characteristics(), start=1):
+            row = ((index - 1) // 2) + 1
+            column = ((index - 1) % 2) * 2
+            tk.Label(
+                characteristics_card,
+                text=f"{label}",
+                bg=COLORS["surface"],
+                fg=COLORS["muted"],
+                font=("TkDefaultFont", 9, "bold"),
+            ).grid(row=row, column=column, sticky=tk.W, padx=(0, 8), pady=4)
+            tk.Label(
+                characteristics_card,
+                text=value,
+                bg=COLORS["surface"],
+                fg=COLORS["text"],
+                wraplength=360,
+                justify=tk.LEFT,
+            ).grid(row=row, column=column + 1, sticky=tk.W, padx=(0, 24), pady=4)
+        characteristics_card.columnconfigure(1, weight=1)
+        characteristics_card.columnconfigure(3, weight=1)
+
+        tests_card = make_card(content, fill=tk.BOTH, expand=True)
+        tk.Label(
+            tests_card,
+            text="Test cases",
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(anchor=tk.W)
+        tk.Label(
+            tests_card,
+            text="All test cases are selected by default.",
+            bg=COLORS["surface"],
+            fg=COLORS["muted"],
+        ).pack(anchor=tk.W, pady=(2, 10))
+
+        list_frame = tk.Frame(tests_card, bg=COLORS["surface"])
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+        canvas = tk.Canvas(list_frame, bg=COLORS["surface"], highlightthickness=0)
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=canvas.yview)
-        self.check_frame = ttk.Frame(canvas)
+        self.check_frame = tk.Frame(canvas, bg=COLORS["surface"])
         self.check_frame.bind("<Configure>", lambda event: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=self.check_frame, anchor=tk.NW)
         canvas.configure(yscrollcommand=scrollbar.set)
@@ -166,18 +261,38 @@ class SelectionWindow(ttk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         if not self.test_cases:
-            ttk.Label(self.check_frame, text="No test cases found in ./test_cases").pack(anchor=tk.W)
+            tk.Label(
+                self.check_frame,
+                text="No test cases found in ./test_cases",
+                bg=COLORS["surface"],
+                fg=COLORS["muted"],
+            ).pack(anchor=tk.W)
         for test_case in self.test_cases:
-            var = tk.BooleanVar(value=True)
-            self.selected[test_case] = var
-            text = test_case.name if not test_case.description else f"{test_case.name} — {test_case.description}"
-            ttk.Checkbutton(self.check_frame, text=text, variable=var).pack(anchor=tk.W, pady=3)
+            self.add_test_case_checkbox(test_case)
 
-        buttons = ttk.Frame(self)
+        buttons = tk.Frame(tests_card, bg=COLORS["surface"])
         buttons.pack(fill=tk.X)
-        ttk.Button(buttons, text="Select all", command=lambda: self.set_all(True)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons, text="Deselect all", command=lambda: self.set_all(False)).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons, text="Run test cases", command=self.run_selected).pack(side=tk.RIGHT)
+        ttk.Button(buttons, text="Select all", style="Secondary.TButton", command=lambda: self.set_all(True)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons, text="Deselect all", style="Secondary.TButton", command=lambda: self.set_all(False)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons, text="Run test cases", style="Primary.TButton", command=self.run_selected).pack(side=tk.RIGHT)
+
+    def add_test_case_checkbox(self, test_case: TestCase) -> None:
+        var = tk.BooleanVar(value=True)
+        self.selected[test_case] = var
+        row = tk.Frame(self.check_frame, bg=COLORS["surface_soft"], highlightbackground=COLORS["border"], highlightthickness=1, padx=12, pady=8)
+        row.pack(fill=tk.X, pady=4)
+        text = test_case.name if not test_case.description else f"{test_case.name} — {test_case.description}"
+        tk.Checkbutton(
+            row,
+            text=text,
+            variable=var,
+            bg=COLORS["surface_soft"],
+            activebackground=COLORS["primary_soft"],
+            fg=COLORS["text"],
+            selectcolor=COLORS["primary_soft"],
+            anchor=tk.W,
+            font=("TkDefaultFont", 10, "bold"),
+        ).pack(fill=tk.X, anchor=tk.W)
 
     def set_all(self, value: bool) -> None:
         for variable in self.selected.values():
@@ -202,13 +317,14 @@ class RunWindow(ttk.Frame):
         selected_cases: list[TestCase],
         on_close: Callable[[], None],
     ) -> None:
-        super().__init__(master, padding=10)
+        super().__init__(master)
         self.master = master
         self.all_cases = all_cases
         self.selected_cases = selected_cases
         self.on_close = on_close
         self.status_by_case = {case: ("pending" if case in selected_cases else "skipped") for case in all_cases}
-        self.status_labels: dict[TestCase, ttk.Label] = {}
+        self.status_rows: dict[TestCase, tk.Frame] = {}
+        self.status_labels: dict[TestCase, tk.Label] = {}
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.pack(fill=tk.BOTH, expand=True)
         self.build_ui()
@@ -220,37 +336,112 @@ class RunWindow(ttk.Frame):
 
     def build_ui(self) -> None:
         self.master.title("Spartan Test Runner — Running")
-        paned = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
-        paned.pack(fill=tk.BOTH, expand=True)
+        self.master.configure(bg=COLORS["log_bg"])
+        shell = tk.Frame(self, bg=COLORS["log_bg"], padx=14, pady=14)
+        shell.pack(fill=tk.BOTH, expand=True)
 
-        log_frame = ttk.LabelFrame(paned, text="Execution logs", padding=8)
-        status_frame = ttk.LabelFrame(paned, text="Test case statuses", padding=8)
-        paned.add(log_frame, weight=1)
-        paned.add(status_frame, weight=1)
+        title_bar = tk.Frame(shell, bg=COLORS["log_bg"])
+        title_bar.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(
+            title_bar,
+            text="Execution report",
+            bg=COLORS["log_bg"],
+            fg="#ffffff",
+            font=("TkDefaultFont", 22, "bold"),
+        ).pack(side=tk.LEFT)
+        tk.Label(
+            title_bar,
+            text="Press Esc to leave fullscreen",
+            bg=COLORS["log_bg"],
+            fg="#94a3b8",
+        ).pack(side=tk.RIGHT)
 
-        self.log_text = tk.Text(log_frame, wrap=tk.WORD, state=tk.DISABLED, bg="#111827", fg="#e5e7eb", insertbackground="#e5e7eb")
+        body = tk.PanedWindow(shell, orient=tk.HORIZONTAL, sashwidth=8, bg=COLORS["log_bg"], bd=0)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        log_frame = tk.Frame(body, bg="#111827", highlightbackground="#334155", highlightthickness=1, padx=10, pady=10)
+        status_frame = tk.Frame(body, bg=COLORS["surface"], highlightbackground="#334155", highlightthickness=1, padx=12, pady=12)
+        body.add(log_frame, stretch="always", minsize=400)
+        body.add(status_frame, stretch="always", minsize=400)
+
+        tk.Label(
+            log_frame,
+            text="Live logs",
+            bg="#111827",
+            fg="#ffffff",
+            font=("TkDefaultFont", 14, "bold"),
+        ).pack(anchor=tk.W, pady=(0, 8))
+        self.log_text = tk.Text(
+            log_frame,
+            wrap=tk.WORD,
+            state=tk.DISABLED,
+            bg=COLORS["log_bg"],
+            fg=COLORS["log_text"],
+            insertbackground=COLORS["log_text"],
+            relief=tk.FLAT,
+            padx=10,
+            pady=10,
+            font=("TkFixedFont", 10),
+        )
+        for tag, color in LOG_TAG_COLORS.items():
+            self.log_text.tag_configure(tag, foreground=color)
         log_scroll = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=log_scroll.set)
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        for row, test_case in enumerate(self.all_cases):
-            ttk.Label(status_frame, text=test_case.name).grid(row=row, column=0, sticky=tk.W, padx=(0, 20), pady=5)
-            label = ttk.Label(status_frame, text=self.status_by_case[test_case].upper())
-            label.grid(row=row, column=1, sticky=tk.W, pady=5)
-            self.status_labels[test_case] = label
-        status_frame.columnconfigure(0, weight=1)
+        tk.Label(
+            status_frame,
+            text="Test case statuses",
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=("TkDefaultFont", 14, "bold"),
+        ).pack(anchor=tk.W)
+        tk.Label(
+            status_frame,
+            text="Color-coded execution report",
+            bg=COLORS["surface"],
+            fg=COLORS["muted"],
+        ).pack(anchor=tk.W, pady=(2, 10))
+
+        for test_case in self.all_cases:
+            self.add_status_row(status_frame, test_case)
+
+    def add_status_row(self, parent: tk.Widget, test_case: TestCase) -> None:
+        status = self.status_by_case[test_case]
+        style = STATUS_STYLES[status]
+        row = tk.Frame(parent, bg=style["bg"], highlightbackground=COLORS["border"], highlightthickness=1, padx=12, pady=10)
+        row.pack(fill=tk.X, pady=5)
+        tk.Label(
+            row,
+            text=test_case.name,
+            bg=style["bg"],
+            fg=COLORS["text"],
+            font=("TkDefaultFont", 11, "bold"),
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, anchor=tk.W)
+        label = tk.Label(
+            row,
+            text=self.format_status(status),
+            bg=style["bg"],
+            fg=style["fg"],
+            font=("TkDefaultFont", 10, "bold"),
+            padx=10,
+            pady=4,
+        )
+        label.pack(side=tk.RIGHT)
+        self.status_rows[test_case] = row
+        self.status_labels[test_case] = label
 
     def worker(self) -> None:
-        self.events.put(("log", "Starting selected test cases...\n"))
+        self.events.put(("log", ("Starting selected test cases...\n", "info")))
         selected_set = set(self.selected_cases)
         for test_case in self.all_cases:
             if test_case not in selected_set:
                 self.events.put(("status", (test_case, "skipped")))
-                self.events.put(("log", f"[{test_case.name}] skipped\n"))
+                self.events.put(("log", (f"[{test_case.name}] skipped\n", "skipped")))
                 continue
             self.events.put(("status", (test_case, "running")))
-            self.events.put(("log", f"\n[{test_case.name}] running: {' '.join(test_case.command)}\n"))
+            self.events.put(("log", (f"\n[{test_case.name}] running: {' '.join(test_case.command)}\n", "running")))
             start = time.monotonic()
             try:
                 process = subprocess.Popen(
@@ -263,17 +454,17 @@ class RunWindow(ttk.Frame):
                 )
                 assert process.stdout is not None
                 for line in process.stdout:
-                    self.events.put(("log", f"[{test_case.name}] {line}"))
+                    self.events.put(("log", (f"[{test_case.name}] {line}", "info")))
                 return_code = process.wait()
             except Exception as exc:  # subprocess/runtime error belongs in the UI log
-                self.events.put(("log", f"[{test_case.name}] ERROR: {exc}\n"))
+                self.events.put(("log", (f"[{test_case.name}] ERROR: {exc}\n", "error")))
                 return_code = 1
 
             elapsed = time.monotonic() - start
             status = "passed" if return_code == 0 else "failed"
             self.events.put(("status", (test_case, status)))
-            self.events.put(("log", f"[{test_case.name}] {status.upper()} in {elapsed:.1f}s (exit code {return_code})\n"))
-        self.events.put(("log", "\nAll test cases finished. Press Esc to leave fullscreen mode.\n"))
+            self.events.put(("log", (f"[{test_case.name}] {status.upper()} in {elapsed:.1f}s (exit code {return_code})\n", status)))
+        self.events.put(("log", ("\nAll test cases finished. Press Esc to leave fullscreen mode.\n", "info")))
         self.events.put(("done", None))
 
     def process_events(self) -> None:
@@ -281,7 +472,8 @@ class RunWindow(ttk.Frame):
             while True:
                 event, payload = self.events.get_nowait()
                 if event == "log":
-                    self.append_log(str(payload))
+                    text, tag = payload  # type: ignore[misc]
+                    self.append_log(str(text), str(tag))
                 elif event == "status":
                     test_case, status = payload  # type: ignore[misc]
                     self.update_status(test_case, status)
@@ -289,25 +481,33 @@ class RunWindow(ttk.Frame):
             pass
         self.after(100, self.process_events)
 
-    def append_log(self, text: str) -> None:
+    def append_log(self, text: str, tag: str = "info") -> None:
         self.log_text.configure(state=tk.NORMAL)
-        self.log_text.insert(tk.END, text)
+        self.log_text.insert(tk.END, text, tag)
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
     def update_status(self, test_case: TestCase, status: str) -> None:
         self.status_by_case[test_case] = status
+        style = STATUS_STYLES[status]
+        row = self.status_rows[test_case]
         label = self.status_labels[test_case]
-        label.configure(text=status.upper())
+        row.configure(bg=style["bg"])
+        for child in row.winfo_children():
+            child.configure(bg=style["bg"])
+        label.configure(text=self.format_status(status), fg=style["fg"])
+
+    @staticmethod
+    def format_status(status: str) -> str:
+        style = STATUS_STYLES[status]
+        return f"{style['icon']} {status.upper()}"
 
 
 def main() -> None:
     root = tk.Tk()
-    root.geometry("1000x700")
-    root.minsize(800, 500)
-    style = ttk.Style(root)
-    if "clam" in style.theme_names():
-        style.theme_use("clam")
+    root.geometry("1100x760")
+    root.minsize(900, 600)
+    configure_theme(root)
     SelectionWindow(root, load_test_cases())
     root.mainloop()
 

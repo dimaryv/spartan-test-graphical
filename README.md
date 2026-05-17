@@ -58,8 +58,8 @@ The first screen detects and displays base server characteristics, then lists al
 
 After starting execution, the app opens a fullscreen run view split vertically:
 
-- left side: live text logs from test case execution;
-- right side: all test cases in order with `PENDING`, `RUNNING`, `PASSED`, `FAILED`, or `SKIPPED` status.
+- left side: live text logs from test case execution with colored highlights for running, passed, failed, skipped, and error messages;
+- right side: all test cases in order with color-coded `PENDING`, `RUNNING`, `PASSED`, `FAILED`, or `SKIPPED` status badges.
 
 Press `Esc` to leave fullscreen mode.
 
