@@ -1,0 +1,5 @@
+{
+  "name": "Sleep 20 seconds",
+  "description": "Waits for 20 seconds to demonstrate the running status animation",
+  "command": ["{python}", "{case_dir}/run.py"]
+}
