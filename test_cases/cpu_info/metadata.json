@@ -1,0 +1,5 @@
+{
+  "name": "CPU information",
+  "description": "Shows processor model and core count",
+  "command": ["{python}", "{case_dir}/run.py"]
+}
