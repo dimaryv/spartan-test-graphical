@@ -1,0 +1,12 @@
+{
+  "name": "Disk information",
+  "description": "Shows mounted filesystems and available space",
+  "command": [
+    "{python}",
+    "{case_dir}/run.py"
+  ],
+  "configs": [
+    "intel_2s",
+    "amd_2s"
+  ]
+}
