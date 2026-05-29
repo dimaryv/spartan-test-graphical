@@ -1,0 +1,52 @@
+{
+  "configs": [
+    {
+      "id": "intel_2s",
+      "name": "2xCPU Intel",
+      "description": "Dual-socket Intel server configuration",
+      "phase": 2,
+      "asset_config": "intel_2s",
+      "components": {
+        "cpu": 2,
+        "sas": 4,
+        "nvme": 2,
+        "ssd": 2,
+        "hdd": 4,
+        "usb": 1,
+        "memory": 16
+      }
+    },
+    {
+      "id": "intel_1s",
+      "name": "1xCPU Intel",
+      "description": "Single-socket Intel server configuration",
+      "phase": 2,
+      "asset_config": "intel_1s",
+      "components": {
+        "cpu": 1,
+        "sas": 2,
+        "nvme": 1,
+        "ssd": 2,
+        "hdd": 2,
+        "usb": 1,
+        "memory": 8
+      }
+    },
+    {
+      "id": "amd_2s",
+      "name": "2xCPU AMD",
+      "description": "Dual-socket AMD server configuration",
+      "phase": 2,
+      "asset_config": "amd_2s",
+      "components": {
+        "cpu": 2,
+        "sas": 4,
+        "nvme": 4,
+        "ssd": 2,
+        "hdd": 4,
+        "usb": 1,
+        "memory": 16
+      }
+    }
+  ]
+}

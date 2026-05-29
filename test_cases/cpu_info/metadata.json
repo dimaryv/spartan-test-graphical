@@ -1,5 +1,11 @@
 {
   "name": "CPU information",
   "description": "Shows processor model and core count",
-  "command": ["{python}", "{case_dir}/run.py"]
+  "command": [
+    "{python}",
+    "{case_dir}/run.py"
+  ],
+  "configs": [
+    "all"
+  ]
 }
